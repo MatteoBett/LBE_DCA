@@ -3,10 +3,11 @@ import time
 from typing import Tuple, Callable, Dict
 import torch
 
-from genseq.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
-from genseq.utils import get_mask_save
-from genseq.statmech import _update_weights_AIS, compute_log_likelihood
-from genseq.checkpoint import LinearCheckpoint
+from adabmDCA.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
+from adabmDCA.utils import get_mask_save
+from adabmDCA.statmech import _update_weights_AIS, compute_log_likelihood, compute_entropy, _compute_ess
+from adabmDCA.checkpoint import Checkpoint
+
 
 @torch.jit.script
 def compute_gradient(
@@ -110,11 +111,11 @@ def train_graph(
     lr: float,
     max_epochs: int,
     target_pearson: float,
+    checkpoint: Checkpoint | None = None,
     check_slope: bool = False,
     log_weights: torch.Tensor | None = None,
     progress_bar: bool = True,
     gap_bias_flag: bool = False,
-    checkpoint : LinearCheckpoint | None = None
 ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor], torch.Tensor]:
     """Trains the model on a given graph until the target Pearson correlation is reached or the maximum number of epochs is exceeded.
 
@@ -142,6 +143,7 @@ def train_graph(
     device = fi.device
     dtype = fi.dtype
     L, q = fi.shape
+    time_start = time.time()
     
     # log_weights used for the online computing of the log-likelihood
     if log_weights is None:
@@ -190,7 +192,6 @@ def train_graph(
         
         # Store the previous parameters
         params_prev = {key: value.clone() for key, value in params.items()}
-
         # Update the parameters
         params = update_params(
             fi=fi,
@@ -213,7 +214,6 @@ def train_graph(
         # Update the Markov chains
         chains = sampler(chains=chains, params=params, nsweeps=nsweeps, gap_bias_flag=gap_bias_flag)
         epochs += 1
-
         # Compute the single-point and two-points frequencies of the simulated data
         pi = get_freq_single_point(data=chains)            
         pij = get_freq_two_points(data=chains)
@@ -224,14 +224,55 @@ def train_graph(
         if progress_bar:
             pbar.n = min(max(0, float(pearson)), target_pearson)
             pbar.set_description(f"Epochs: {epochs} - LL: {log_likelihood:.2f}")
+            
+        # Save the model if a checkpoint is reached
+        if checkpoint is not None:
+            if checkpoint.check(epochs, params, chains):
+                entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
+                ess = _compute_ess(log_weights)
+                checkpoint.log(
+                    {
+                        "Epochs": epochs,
+                        "Pearson": pearson,
+                        "Slope": slope,
+                        "LL_train": log_likelihood,
+                        "ESS": ess,
+                        "Entropy": entropy,
+                        "Density": 1.0,
+                        "Time": time.time() - time_start,
+                    }
+                )
+                checkpoint.save(
+                    params=params,
+                    mask=mask_save,
+                    chains=chains,
+                    log_weights=log_weights,
+                )
                 
     if progress_bar:
         pbar.close()
     
-    checkpoint.save(
+    if checkpoint is not None:
+        entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
+        ess = _compute_ess(log_weights)
+        checkpoint.log(
+            {
+                "Epochs": epochs,
+                "Pearson": pearson,
+                "Slope": slope,
+                "LL_train": log_likelihood,
+                "ESS": ess,
+                "Entropy": entropy,
+                "Density": 1.0,
+                "Time": time.time() - time_start,
+            }
+        )
+            
+        checkpoint.save(
             params=params,
             mask=mask_save,
             chains=chains,
             log_weights=log_weights,
         )
+        
     return chains, params, log_weights

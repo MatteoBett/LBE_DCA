@@ -16,6 +16,10 @@ class Checkpoint(ABC):
         self,
         file_paths: dict,
         tokens: str,
+        args: dict,
+        params: Dict[str, torch.Tensor] | None = None,
+        chains: Dict[str, torch.Tensor] | None = None,
+        use_wandb: bool = False,
     ):
         """Initializes the Checkpoint class.
 
@@ -26,9 +30,95 @@ class Checkpoint(ABC):
             params (Dict[str, torch.Tensor] | None, optional): Parameters of the model. Defaults to None.
             chains (Dict[str, torch.Tensor] | None, optional): Chains. Defaults to None.
             use_wandb (bool, optional): Whether to use Weights & Biases for logging. Defaults to False.
-        """           
+        """
+        if not isinstance(args, dict):
+            args = vars(args)
+            
         self.file_paths = file_paths
         self.tokens = tokens
+        
+        self.wandb = use_wandb
+        if self.wandb:
+            wandb.init(project="adabmDCA", config=args)
+            
+        if params is not None:
+            self.params = {key: value.clone() for key, value in params.items()}
+        else:
+            self.params = None
+        if chains is not None:
+            self.chains = chains.clone()
+        else:
+            self.chains = None
+        self.max_epochs = args["nepochs"]
+        
+        self.logs = {
+            "Epochs": 0,
+            "Pearson": 0.0,
+            "Slope": 0.0,
+            "LL_train": 0.0,
+            "LL_test": 0.0,
+            "ESS": 0.0,
+            "Entropy": 0.0,
+            "Density": 0.0,
+            "Time": 0.0,
+        }
+        
+        template = "{0:<20} {1:<50}\n"  
+        with open(file_paths["log"], "w") as f:
+            f.write(template.format("label:", "N/A"))
+            
+            f.write(template.format("model:", str(args["DCA_model_"])))
+            f.write(template.format("input MSA:", str(args["infile_path"])))
+            f.write(template.format("alphabet:", args["alphabet"]))
+            f.write(template.format("sampler:", args["MCMC_sampler"]))
+            f.write(template.format("nchains:", args["nchains"]))
+            f.write(template.format("nsweeps:", args["nsweeps"]))
+            f.write(template.format("lr:", args["lr"]))
+            f.write(template.format("target Pearson Cij:", args["target_pearson"]))
+            if args["DCA_model_"] == "eaDCA":
+                f.write(template.format("gsteps:", args["gsteps"]))
+                f.write(template.format("factivate:", args["factivate"]))
+            f.write("\n")
+            # write the header of the log file
+            header_string = " ".join([f"{key:<10}" for key in self.logs.keys()])
+            f.write(header_string + "\n")
+        
+        
+    def log(
+        self,
+        record: Dict[str, Any],
+    ) -> None:
+        """Adds a key-value pair to the log dictionary
+
+        Args:
+            record (Dict[str, Any]): Key-value pairs to be added to the log dictionary.
+        """
+        for key, value in record.items():
+            if key not in self.logs.keys():
+                raise ValueError(f"Key {key} not recognized.")
+        
+            if isinstance(value, torch.Tensor):
+                self.logs[key] = value.item()
+            else:
+                self.logs[key] = value
+        
+    
+    @abstractmethod
+    def check(
+        self,
+        updates: int,
+        *args,
+        **kwargs,
+    ) -> bool:
+        """Checks if a checkpoint has been reached.
+        
+        Args:
+            updates (int): Number of gradient updates performed.
+
+        Returns:
+            bool: Whether a checkpoint has been reached.
+        """
+        pass
         
         
     @abstractmethod 
@@ -55,14 +145,41 @@ class LinearCheckpoint(Checkpoint):
         self,
         file_paths: dict,
         tokens: str,
+        args: dict,
+        params: Dict[str, torch.Tensor] | None = None,
+        chains: Dict[str, torch.Tensor] | None = None,
         checkpt_interval: int = 50,
+        use_wandb: bool = False,
+        **kwargs,
     ):
         super().__init__(
             file_paths=file_paths,
             tokens=tokens,
+            args=args,
+            params=params,
+            chains=chains,
+            use_wandb=use_wandb,
         )
         self.checkpt_interval = checkpt_interval
+        
+    
+    def check(
+        self,
+        updates: int,
+        *args,
+        **kwargs,
+    ) -> bool:
+        """Checks if a checkpoint has been reached.
+        
+        Args:
+            updates (int): Number of gradient updates performed.
 
+        Returns:
+            bool: Whether a checkpoint has been reached.
+        """
+        return (updates % self.checkpt_interval == 0) or (updates == self.max_epochs)
+    
+    
     def save(
         self,
         params: Dict[str, torch.Tensor],
@@ -77,10 +194,16 @@ class LinearCheckpoint(Checkpoint):
             mask (torch.Tensor): Mask of the model's coupling matrix representing the interaction graph
             chains (Dict[str, torch.Tensor]): Chains.
             log_weights (torch.Tensor): Log of the chain weights. Used for AIS.
-        """           
+        """
+        if self.wandb:
+            wandb.log(self.logs)
+            
         save_params(fname=self.file_paths["params"], params=params, mask=mask, tokens=self.tokens)
         save_chains(fname=self.file_paths["chains"], chains=chains.argmax(dim=-1), tokens=self.tokens, log_weights=log_weights)
         
+        out_string = " ".join([f"{value:<10.3f}" if isinstance(value, float) else f"{value:<10}" for value in self.logs.values()])
+        with open(self.file_paths["log"], "a") as f:
+            f.write(out_string + "\n")
             
             
 class AcceptanceCheckpoint(Checkpoint):

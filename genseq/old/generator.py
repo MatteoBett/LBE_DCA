@@ -6,7 +6,7 @@ import os, sys, subprocess
 #########################################################
 #                      Dependencies                     #
 #########################################################
-from genseq.train import main
+from genseq.train_dir.train import main
 
 #########################################################
 #                      Own modules                      #

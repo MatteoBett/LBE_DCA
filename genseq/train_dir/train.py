@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import importlib
 
 import torch
 
@@ -7,19 +8,29 @@ from genseq.dataset import DatasetDCA
 from genseq.fasta import get_tokens
 from genseq.stats import get_freq_single_point, get_freq_two_points
 from genseq.utils import init_chains, init_parameters
-from genseq.sampling import get_sampler
+from genseq.train_dir.sampling import get_sampler
 from genseq.functional import one_hot
 import genseq.model.eaDCA as model
-from genseq.checkpoint import LinearCheckpoint
+from genseq.checkpoint import get_checkpoint
 
 
-def main(infile_path : str, 
-         outdir: str, 
-         DCA_model_ : str = "eaDCA", 
-         bias : bool = False,
-         MCMC_sampler : str = "gibbs",
-         alphabet : str = 'rna',
-         nchains : int = 10000):
+def main(
+        infile_path : str, 
+        outdir: str, 
+        DCA_model_ : str = "eaDCA", 
+        bias : bool = False,
+        MCMC_sampler : str = "gibbs",
+        alphabet : str = 'rna',
+        nchains : int = 10000,
+        target_pearson : float=0.95,
+        nsweeps : int =10,
+        nepochs : int =500,
+        lr : float =0.05,
+        factivate : float =0.001,
+        gsteps : int =10,
+        drate : float =0.01,
+        target_density : float=0.02):
+    args = locals()
 
     print("\n" + "".join(["*"] * 10) + f" Training {DCA_model_} model " + "".join(["*"] * 10) + "\n")
     # Set the device
@@ -40,10 +51,11 @@ def main(infile_path : str,
     # Create the folder where to save the model
     folder = Path(outdir)
     folder.mkdir(parents=True, exist_ok=True)
-
+    
     file_paths = {
-    "params" : folder / Path(f"params.dat"),
-    "chains" : folder / Path(f"chains.fasta")
+        "log" : folder / Path(f"adabmDCA.log"),
+        "params" : folder / Path(f"params.dat"),
+        "chains" : folder / Path(f"chains.fasta")
     }
 
     # Import dataset
@@ -55,6 +67,7 @@ def main(infile_path : str,
         dtype=dtype,
     )
     
+    DCA_model = importlib.import_module(f"adabmDCA.models.{DCA_model_}")
     tokens = get_tokens(alphabet)
     
     # Save the weights if not already provided
@@ -74,26 +87,41 @@ def main(infile_path : str,
     
     pseudocount = 1. / dataset.get_effective_size()
     print(f"Pseudocount automatically set to {pseudocount}.")
-
+        
     data_oh = one_hot(dataset.data, num_classes=q).to(dtype)
     fi_target = get_freq_single_point(data=data_oh, weights=dataset.weights, pseudo_count=pseudocount)
     fij_target = get_freq_two_points(data=data_oh, weights=dataset.weights, pseudo_count=pseudocount) 
     
+
     params = init_parameters(fi=fi_target)
-    mask = torch.zeros(size=(L, q, L, q), device=device, dtype=torch.bool)
     
+    if DCA_model_ in ["bmDCA", "edDCA"]:
+        mask = torch.ones(size=(L, q, L, q), dtype=torch.bool, device=device)
+        mask[torch.arange(L), :, torch.arange(L), :] = 0
+        
+    else:
+        mask = torch.zeros(size=(L, q, L, q), device=device, dtype=torch.bool)
+    
+
     print(f"Number of chains set to {nchains}.")
     chains = init_chains(num_chains=nchains, L=L, q=q, fi=fi_target, device=device, dtype=dtype)
     log_weights = torch.zeros(size=(nchains,), device=device, dtype=dtype)
         
     # Select the sampling function
     sampler = get_sampler(MCMC_sampler)
+    
     print("\n")
+    
 
-    checkpoint = LinearCheckpoint(file_paths=file_paths,
-                                  tokens=tokens)
+    checkpoint = get_checkpoint('linear')(
+        file_paths=file_paths,
+        tokens=tokens,
+        args = args,
+        params=params,
+        chains=chains,
+    )
 
-    model.fit(
+    DCA_model.fit(
         sampler=sampler,
         fij_target=fij_target,
         fi_target=fi_target,
@@ -110,8 +138,11 @@ def main(infile_path : str,
         factivate=0.001,
         gsteps=10,
         gap_bias_flag=bias,
-        drate=None,
-        target_density=None,
-        checkpoint=checkpoint
+        drate=0.01,
+        target_density=0.02,
+        checkpoint=checkpoint,
     )
-
+    
+    
+if __name__ == "__main__":
+    main()

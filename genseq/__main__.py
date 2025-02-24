@@ -11,10 +11,11 @@ import torch
 #########################################################
 #                      Own modules                      #
 #########################################################
-from genseq import dataset, train, energies
+from genseq import dataset, energies
 import genseq.display.plot as display
 import genseq.old
 import genseq.old.generator
+import genseq.train_dir.train as push
 
 
 if __name__ == "__main__":
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     model_type = "eaDCA"
     run_generation = True
     run_energy = True
-    bias = True
+    bias = False
 
     for family_file, infile_path in dataset.family_stream(family_dir=family_dir):
         if bias:
@@ -34,9 +35,9 @@ if __name__ == "__main__":
         
         if run_generation:
             if bias is True:
-                train.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias)
+                push.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias)
             else:
-                train.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias)
+                push.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias)
 
         chain_file = os.path.join(family_outdir, "chains.fasta")
         params_dca = os.path.join(family_outdir, "params.dat")

@@ -1,13 +1,16 @@
+import time
 from tqdm import tqdm
 from typing import Callable
 
 import torch
 
-from genseq.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
-from genseq.training import train_graph
-from genseq.graph import activate_graph, compute_density
-from genseq.statmech import compute_log_likelihood
-from genseq.checkpoint import LinearCheckpoint
+from adabmDCA.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
+from adabmDCA.training import train_graph
+from adabmDCA.utils import get_mask_save
+from adabmDCA.graph import activate_graph, compute_density
+from adabmDCA.statmech import compute_log_likelihood, compute_entropy, _compute_ess
+from adabmDCA.checkpoint import Checkpoint
+
 
 def fit(
     sampler: Callable,
@@ -19,12 +22,13 @@ def fit(
     log_weights: torch.Tensor,
     target_pearson: float,
     nsweeps: int,
+    nepochs: int,
     pseudo_count: float,
     lr: float,
     factivate: float,
     gsteps: int,
     gap_bias_flag: bool,
-    checkpoint : LinearCheckpoint,
+    checkpoint: Checkpoint | None = None,
     *args, **kwargs,
 ) -> None:
     """
@@ -45,8 +49,6 @@ def fit(
         lr (float): Learning rate.
         factivate (float): Fraction of inactive couplings to activate at each step.
         gsteps (int): Number of gradient updates to be performed on a given graph.
-        fi_test (torch.Tensor | None): Single-point frequencies of the test data. Defaults to None.
-        fij_test (torch.Tensor | None): Two-point frequencies of the test data. Defaults to None.
         checkpoint (Checkpoint | None): Checkpoint class to be used to save the model. Defaults to None.
     """
     # Check the input sizes
@@ -59,11 +61,16 @@ def fit(
     
     device = fi_target.device
     dtype = fi_target.dtype
+    checkpoint.checkpt_interval = 10 # Save the model every 10 graph updates
+    checkpoint.max_epochs = nepochs
     
     graph_upd = 0
     density = compute_density(mask) * 100
     L, q = fi_target.shape
         
+    # Mask for saving only the upper-diagonal matrix
+    mask_save = get_mask_save(L, q, device=device)
+    
     # log_weights used for the online computing of the log-likelihood
     logZ = (torch.logsumexp(log_weights, dim=0) - torch.log(torch.tensor(len(chains), device=device, dtype=dtype))).item()
     
@@ -74,7 +81,12 @@ def fit(
     
     # Number of active couplings
     nactive = mask.sum()
+    
+    # Training loop
+    time_start = time.time()
     log_likelihood = compute_log_likelihood(fi=fi_target, fij=fij_target, params=params, logZ=logZ)
+
+    entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
         
     pbar = tqdm(initial=max(0, float(pearson)), total=target_pearson, colour="red", dynamic_ncols=True, ascii="-#",
                 bar_format="{desc}: {percentage:.2f}%[{bar}] Pearson: {n:.3f}/{total_fmt} [{elapsed}]")
@@ -114,16 +126,9 @@ def fit(
             target_pearson=target_pearson,
             log_weights=log_weights,
             check_slope=False,
+            checkpoint=None,
             progress_bar=False,
             gap_bias_flag=gap_bias_flag,
-            checkpoint=checkpoint
-        )
-        
-        checkpoint.save(
-            params=params,
-            mask=mask,
-            chains=chains,
-            log_weights=log_weights
         )
 
         graph_upd += 1
@@ -138,15 +143,52 @@ def fit(
         logZ = (torch.logsumexp(log_weights, dim=0) - torch.log(torch.tensor(len(chains), device=device, dtype=dtype))).item()
         log_likelihood = compute_log_likelihood(fi=fi_target, fij=fij_target, params=params, logZ=logZ)
         pbar.set_description(f"Graph updates: {graph_upd} - Density: {density:.3f}% - New active couplings: {int(nactive - nactive_old)} - DCA LL: {log_likelihood:.3f}")
-        
-        pbar.n = min(max(0, float(pearson)), target_pearson)   
-    pbar.close()
 
+        # Save the model if a checkpoint is reached
+        if checkpoint.check(graph_upd, params, chains):
+            entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
+            ess = _compute_ess(log_weights)
+            checkpoint.log(
+                {
+                    "Epochs": graph_upd,
+                    "Pearson": pearson,
+                    "Slope": slope,
+                    "LL_train": log_likelihood,
+                    "ESS": ess,
+                    "Entropy": entropy,
+                    "Density": density,
+                    "Time": time.time() - time_start,
+                }
+            )
+            
+            checkpoint.save(
+                params=params,
+                mask=torch.logical_and(mask, mask_save),
+                chains=chains,
+                log_weights=log_weights,
+                )
+        pbar.n = min(max(0, float(pearson)), target_pearson)
+
+    entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
+    ess = _compute_ess(log_weights)
+    checkpoint.log(
+        {
+            "Epochs": graph_upd,
+            "Pearson": pearson,
+            "Slope": slope,
+            "LL_train": log_likelihood,
+            "ESS": ess,
+            "Entropy": entropy,
+            "Density": density,
+            "Time": time.time() - time_start,
+        }
+    )
+                
     checkpoint.save(
         params=params,
-        mask=mask,
+        mask=torch.logical_and(mask, mask_save),
         chains=chains,
-        log_weights=log_weights
-    )
-
-    
+        log_weights=log_weights,
+        )
+    print(f"Completed, model parameters saved in {checkpoint.file_paths['params']}")
+    pbar.close()
