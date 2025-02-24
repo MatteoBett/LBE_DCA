@@ -11,7 +11,7 @@ import torch
 #########################################################
 #                      Own modules                      #
 #########################################################
-from genseq import dataset, energies
+from genseq.tools import dataset, energies
 import genseq.display.plot as display
 import genseq.old
 import genseq.old.generator

@@ -3,10 +3,10 @@ import time
 from typing import Tuple, Callable, Dict
 import torch
 
-from adabmDCA.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
-from adabmDCA.utils import get_mask_save
-from adabmDCA.statmech import _update_weights_AIS, compute_log_likelihood, compute_entropy, _compute_ess
-from adabmDCA.checkpoint import Checkpoint
+from genseq.tools.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
+from genseq.tools.utils import get_mask_save
+from genseq.tools.statmech import _update_weights_AIS, compute_log_likelihood, compute_entropy, _compute_ess
+from genseq.tools.checkpoint import Checkpoint
 
 
 @torch.jit.script

@@ -4,14 +4,14 @@ import importlib
 
 import torch
 
-from genseq.dataset import DatasetDCA
-from genseq.fasta import get_tokens
-from genseq.stats import get_freq_single_point, get_freq_two_points
-from genseq.utils import init_chains, init_parameters
+from genseq.tools.dataset import DatasetDCA
+from genseq.tools.fasta import get_tokens
+from genseq.tools.stats import get_freq_single_point, get_freq_two_points
+from genseq.tools.utils import init_chains, init_parameters
 from genseq.train_dir.sampling import get_sampler
-from genseq.functional import one_hot
+from genseq.tools.functional import one_hot
 import genseq.model.eaDCA as model
-from genseq.checkpoint import get_checkpoint
+from genseq.tools.checkpoint import get_checkpoint
 
 
 def main(

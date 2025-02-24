@@ -4,12 +4,12 @@ from typing import Callable
 
 import torch
 
-from adabmDCA.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
-from adabmDCA.training import train_graph
-from adabmDCA.utils import get_mask_save
-from adabmDCA.graph import activate_graph, compute_density
-from adabmDCA.statmech import compute_log_likelihood, compute_entropy, _compute_ess
-from adabmDCA.checkpoint import Checkpoint
+from genseq.tools.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
+from genseq.train_dir.training import train_graph
+from genseq.tools.utils import get_mask_save
+from genseq.train_dir.graph import activate_graph, compute_density
+from genseq.tools.statmech import compute_log_likelihood, compute_entropy, _compute_ess
+from genseq.tools.checkpoint import Checkpoint
 
 
 def fit(
