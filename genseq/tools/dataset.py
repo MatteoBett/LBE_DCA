@@ -1,9 +1,13 @@
-from typing import Any
+from typing import Any, List, Literal
 from pathlib import Path
-import os
+import os, re
+from collections import Counter
 
 from torch.utils.data import Dataset
 import torch
+from Bio import SeqIO
+import numpy as np
+import matplotlib.pyplot as plt
 
 from genseq.tools.fasta import get_tokens,import_from_fasta,compute_weights
 
@@ -33,7 +37,7 @@ class DatasetDCA(Dataset):
             dtype (torch.dtype, optional): Data type of the dataset. Defaults to torch.float32.
             message (bool, optional): Print the import message. Defaults to True.
         """
-        path_data = Path(path_data)
+        self.path_data = Path(path_data)
         self.names = None
         self.data = None
         self.device = device
@@ -43,10 +47,10 @@ class DatasetDCA(Dataset):
         self.tokens = get_tokens(alphabet) #-ACGU
         
         # Automatically detects if the file is in fasta format and imports the data
-        with open(path_data, "r") as f:
+        with open(self.path_data, "r") as f:
             first_line = f.readline()
         if first_line.startswith(">"):
-            self.names, self.data = import_from_fasta(path_data, tokens=self.tokens, filter_sequences=True)
+            self.names, self.data = import_from_fasta(self.path_data, tokens=self.tokens, filter_sequences=True)
             self.data = torch.tensor(self.data, device=device, dtype=torch.int32)
             # Check if data is empty
             if len(self.data) == 0:
@@ -115,14 +119,62 @@ class DatasetDCA(Dataset):
         self.names = self.names[perm]
         self.weights = self.weights[perm]
 
+    def get_indels_info(self):
+        mat_msa = load_msa(self.path_data, format='matrix').T.tolist()
+        count_gaps = {index : col.count('-') for index, col in enumerate(mat_msa)}
+        mean = np.mean(list(count_gaps.values()))
+        median = np.mean(list(count_gaps.values()))
+        
+        plt.plot(list(range(len(count_gaps))),count_gaps.values())
+        plt.hlines([mean, median], xmin = 0, xmax=len(count_gaps), label=["mean", "median"], colors=['red', 'blue'])
+        plt.show()
 
-def load_msa(path : str):
+    def get_indels(self, char : str = '*', threshold_method : str = "mean" | Literal['mean', 'median', 'phmm']):
+        """
+        Modify the dataset to make the distinction between insertions
+        and deletions. Does **NOT** modify the current alphabet!!
+        Replaces INSERTIONS GAPS with the character passed as argument if the threshold 
+        is reached (i.e., more than 50% of gaps in the MSA)
+        """
+
+        assert threshold_method in ['mean', 'median', 'phmm'], "Threshold calulation incorrect or unavailable."
+
+        mat_msa = load_msa(self.path_data, format='matrix').T.tolist()
+        dico = {}    
+        for index, col in enumerate(mat_msa):
+            dico[index] = col.count('-')
+
+        if threshold_method == "mean":
+            threshold = np.mean(list(dico.values()))
+
+        indexes = []
+        for index, col in enumerate(mat_msa):
+            if dico[index] > threshold:
+                indexes.append(index)
+
+        
+
+def load_msa(infile_path : str, 
+             format : str = 'list' | Literal['list', 'all', 'headers', 'matrix']
+             ) -> List[str] | List[SeqIO.SeqRecord] | np.matrix:
+    
     """ Load the MSA of the family of interest """
-    tokens = get_tokens('rna')
-    headers, sequences = import_from_fasta(path, tokens=tokens, filter_sequences=True)
-    return headers, torch.Tensor(sequences)
+
+    assert format in ['list', 'all', 'headers', 'matrix'], "Output format incorrect or unavailable."
+
+    if format == 'list':
+        return [str(record.seq) for record in SeqIO.parse(infile_path, 'fasta')]
+    if format == 'all':
+        return [record for record in SeqIO.parse(infile_path, 'fasta')]
+    if format == 'headers':
+        return [record.description for record in SeqIO.parse(infile_path, 'fasta')]
+    if format== 'matrix':
+        return np.matrix([list(record.seq) for record in SeqIO.parse(infile_path, 'fasta')])
 
 def family_stream(family_dir : str):
     """ Yield the output of load_msa function for each family directory """
     for family_file in os.listdir(family_dir):
         yield family_file, os.path.join(family_dir, family_file, f"{family_file}.fasta")
+
+def sequences_stream():
+    pass

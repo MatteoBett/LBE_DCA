@@ -14,7 +14,6 @@ def _compute_energy_sequence(
     L, q = params["bias"].shape
     x_oh = x.ravel()
     bias_oh = params["bias"].ravel()
-    print(bias_oh)
     couplings_oh = params["coupling_matrix"].view(L * q, L * q)
     energy = - x_oh @ bias_oh - 0.5 * x_oh @ (couplings_oh @ x_oh)
     

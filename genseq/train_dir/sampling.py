@@ -30,14 +30,14 @@ def _gibbs_sweep(
         # Select the couplings attached to the residue we are considering (i) and flatten along the other residues ({j})
         couplings_residue = params["coupling_matrix"][i].view(q, L * q)
         # Update the chains
-        logit_residue = beta * (params["bias"][i].unsqueeze(0) + chains.reshape(N, L * q) @ couplings_residue.T) # (N, q)
+        logit_residue = params["bias"][i].unsqueeze(0) + chains.reshape(N, L * q) @ couplings_residue.T # (N, q)
     
         if gap_bias_flag:
             logit_residue = logit_residue.transpose(1, 0)
             logit_residue[0] += 1
             logit_residue = logit_residue.transpose(0, 1)
 
-        make_proba = torch.softmax(logit_residue, -1)
+        make_proba = torch.softmax(beta*logit_residue, -1)
         sampled = torch.multinomial(make_proba, 1)
         chains[:, i, :] = one_hot(sampled, num_classes=q).to(logit_residue.dtype).squeeze(1)
         
