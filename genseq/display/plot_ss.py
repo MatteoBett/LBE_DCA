@@ -14,7 +14,7 @@ from genseq.secondary_structure.make_struct import walk_seq
 sns.set_theme('paper')
 
 def kde_boxplot(df : pd.DataFrame, df_col : List[str], bias : str, indel : str):
-    pdf = bpdf.PdfPages(rf'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output/figures/EDA_gaps{bias}.pdf')
+    pdf = bpdf.PdfPages(rf'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output/figures/EDA{indel}{bias}.pdf')
 
     for col in df_col:
         if col == 'generated':
@@ -51,13 +51,15 @@ def homology_vs_gaps(chains_file : str,
     else:
         bias = '_ref'    
     if indel:
-        index = DatasetDCA(infile_path, alphabet='rna').get_indels()
+        index = DatasetDCA(infile_path, alphabet='rna').get_indels(threshold_method="mean")
         indel = "_indel"
     else:
         indel = "_gaps"
 
     df_dico = {'D_MFE' : [], 'PPV': [], 'MCC':[], 'ngaps':[], 'generated' : []}
     for seq, (ref_mfe, tmp_mfe), dist in walk_seq(infile_path=infile_path, genseqs_path=chains_file):
+        if indel == "_indel":
+            seq = "".join([seq[i] for i in index])
         df_dico['ngaps'].append(str(seq).count('-'))
         df_dico['D_MFE'].append(round(abs(ref_mfe-tmp_mfe), 3))
         df_dico['MCC'].append(round(dist.MCC, 3))
@@ -65,6 +67,8 @@ def homology_vs_gaps(chains_file : str,
         df_dico['generated'].append('yes')
     
     for seq, (ref_mfe, tmp_mfe), dist in walk_seq(infile_path=infile_path, genseqs_path=infile_path):
+        if indel == "_indel":
+            seq = "".join([seq[i] for i in index])
         df_dico['ngaps'].append(str(seq).count('-'))
         df_dico['D_MFE'].append(round(abs(ref_mfe-tmp_mfe), 3))
         df_dico['MCC'].append(round(dist.MCC, 3))
@@ -87,6 +91,7 @@ def heatmap_homology_vs_gaps(chains_file : str,
         bias = '_ref'
     
     if indel:
+        index = DatasetDCA(infile_path, alphabet='rna').get_indels(threshold_method="mean")
         indel = "_indel"
     else:
         indel = "_gaps"
@@ -97,6 +102,8 @@ def heatmap_homology_vs_gaps(chains_file : str,
 
     df_dico = {'D_MFE' : [], 'PPV': [], 'MCC':[], 'ngaps':[]}
     for seq, (ref_mfe, tmp_mfe), dist in walk_seq(infile_path=infile_path, genseqs_path=chains_file, indel_mode=indel):
+        if indel== "_indel":
+            seq = "".join([seq[i] for i in index])
         df_dico['ngaps'].append(str(seq).count('-'))
         df_dico['D_MFE'].append(round(abs(ref_mfe-tmp_mfe), 3))
         df_dico['MCC'].append(round(dist.MCC, 3))

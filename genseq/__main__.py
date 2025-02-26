@@ -25,6 +25,7 @@ if __name__ == "__main__":
     run_generation = False
     run_energy = False
     bias = True 
+    indel = False
     nchains = 2721
 
     for family_file, infile_path in dataset.family_stream(family_dir=family_dir):
@@ -50,5 +51,5 @@ if __name__ == "__main__":
 
         base_outdir = "/".join(family_outdir.split("/")[:-1])
         display.plot_energy_vs_gaps(base_outdir=base_outdir, path_save=os.path.join(outdir, "figures", f"{family_file.split('.')[0]}.png"))
-        plot_ss.homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=False)
-        plot_ss.heatmap_homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=False)
+        plot_ss.homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=indel)
+        plot_ss.heatmap_homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=indel)

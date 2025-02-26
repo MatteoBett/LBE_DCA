@@ -149,9 +149,10 @@ class DatasetDCA(Dataset):
 
         indexes = []
         for index, col in enumerate(mat_msa):
-            if dico[index] > threshold:
+            if dico[index] < threshold:
                 indexes.append(index)
 
+        return indexes
         
 
 def load_msa(infile_path : str, 
