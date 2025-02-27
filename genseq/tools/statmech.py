@@ -57,8 +57,8 @@ def _update_weights_AIS(
     Returns:
         torch.Tensor: Log-weights at time t.
     """
-    energy_prev = compute_energy(chains, prev_params)
-    energy_curr = compute_energy(chains, curr_params)
+    energy_prev = compute_energy(X=chains, params=prev_params)
+    energy_curr = compute_energy(X=chains, params=curr_params)
     log_weights += energy_prev - energy_curr
     
     return log_weights

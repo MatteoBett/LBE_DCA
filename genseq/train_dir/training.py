@@ -3,11 +3,16 @@ import time
 from typing import Tuple, Callable, Dict
 import torch
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from genseq.tools.stats import get_freq_single_point, get_freq_two_points, get_correlation_two_points
 from genseq.tools.utils import get_mask_save
 from genseq.tools.statmech import _update_weights_AIS, compute_log_likelihood, compute_entropy, _compute_ess
 from genseq.tools.checkpoint import Checkpoint
 
+sns.set_theme()
+   
 
 @torch.jit.script
 def compute_gradient(
@@ -72,6 +77,7 @@ def update_params(
     params: Dict[str, torch.Tensor],
     mask: torch.Tensor,
     lr: float,
+    gaps_bias_flag : bool = False
 ) -> Dict[str, torch.Tensor]:
     """Updates the parameters of the model.
     
@@ -96,7 +102,7 @@ def update_params(
         for key in params:
             params[key] += lr * grad[key]
         params["coupling_matrix"] *= mask # Remove autocorrelations
-    
+
     return params
 
 
@@ -111,11 +117,13 @@ def train_graph(
     lr: float,
     max_epochs: int,
     target_pearson: float,
+    gaps_target : torch.Tensor,
     checkpoint: Checkpoint | None = None,
     check_slope: bool = False,
     log_weights: torch.Tensor | None = None,
     progress_bar: bool = True,
     gap_bias_flag: bool = False,
+    
 ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor], torch.Tensor]:
     """Trains the model on a given graph until the target Pearson correlation is reached or the maximum number of epochs is exceeded.
 
@@ -143,8 +151,8 @@ def train_graph(
     device = fi.device
     dtype = fi.dtype
     L, q = fi.shape
-    time_start = time.time()
-    
+    time_start = time.time() 
+
     # log_weights used for the online computing of the log-likelihood
     if log_weights is None:
         log_weights = torch.zeros(len(chains), device=device, dtype=dtype)
@@ -154,7 +162,7 @@ def train_graph(
     # Compute the single-point and two-points frequencies of the simulated data
     pi = get_freq_single_point(data=chains, weights=None, pseudo_count=0.)
     pij = get_freq_two_points(data=chains, weights=None, pseudo_count=0.)
-    
+
     def halt_condition(epochs, pearson, slope, check_slope):
         c1 = pearson < target_pearson
         c2 = epochs < max_epochs
@@ -187,7 +195,7 @@ def train_graph(
             bar_format="{desc} {percentage:.2f}%[{bar}] Pearson: {n:.3f}/{total_fmt} [{elapsed}]"
         )
         pbar.set_description(f"Epochs: {epochs} - train LL: {log_likelihood:.2f}")
-    
+
     while not halt_condition(epochs, pearson, slope, check_slope):
         
         # Store the previous parameters
@@ -201,8 +209,9 @@ def train_graph(
             params=params,
             mask=mask,
             lr=lr,
+            gaps_bias_flag=gap_bias_flag
         )
-        
+
         # Compute the weights for the AIS
         log_weights = _update_weights_AIS(
             prev_params=params_prev,
@@ -212,7 +221,7 @@ def train_graph(
         ) 
                 
         # Update the Markov chains
-        chains = sampler(chains=chains, params=params, nsweeps=nsweeps, gap_bias_flag=gap_bias_flag)
+        chains, params = sampler(chains=chains, params=params, nsweeps=nsweeps, gap_bias_flag=gap_bias_flag, gaps_target=gaps_target)
         epochs += 1
         # Compute the single-point and two-points frequencies of the simulated data
         pi = get_freq_single_point(data=chains)            
@@ -240,6 +249,7 @@ def train_graph(
                         "Entropy": entropy,
                         "Density": 1.0,
                         "Time": time.time() - time_start,
+                        "Gaps_freq": pi[:, 0].mean()
                     }
                 )
                 checkpoint.save(
@@ -265,6 +275,7 @@ def train_graph(
                 "Entropy": entropy,
                 "Density": 1.0,
                 "Time": time.time() - time_start,
+                "Gaps_freq": pi[:, 0].mean()
             }
         )
             
