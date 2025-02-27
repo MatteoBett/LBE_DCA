@@ -62,7 +62,6 @@ def _get_freq_two_points(
     
     M, L, q = data.shape
     data_oh = data.reshape(M, q * L)
-    
     fij = (data_oh * weights).T @ data_oh
     # Apply the pseudo count
     fij = (1. - pseudo_count) * fij + (pseudo_count / q**2)

@@ -29,7 +29,8 @@ def main(
         factivate : float =0.001,
         gsteps : int =10,
         drate : float =0.01,
-        target_density : float=0.02):
+        target_density : float=0.02,
+        gaps_fraction : float = 0.15):
     args = locals()
 
     print("\n" + "".join(["*"] * 10) + f" Training {DCA_model_} model " + "".join(["*"] * 10) + "\n")
@@ -67,7 +68,7 @@ def main(
         dtype=dtype,
     )
     
-    DCA_model = importlib.import_module(f"adabmDCA.models.{DCA_model_}")
+    DCA_model = importlib.import_module(f"genseq.model.{DCA_model_}")
     tokens = get_tokens(alphabet)
     
     # Save the weights if not already provided
@@ -91,10 +92,8 @@ def main(
     data_oh = one_hot(dataset.data, num_classes=q).to(dtype)
     fi_target = get_freq_single_point(data=data_oh, weights=dataset.weights, pseudo_count=pseudocount)
     fij_target = get_freq_two_points(data=data_oh, weights=dataset.weights, pseudo_count=pseudocount) 
-    
 
     params = init_parameters(fi=fi_target)
-    
     if DCA_model_ in ["bmDCA", "edDCA"]:
         mask = torch.ones(size=(L, q, L, q), dtype=torch.bool, device=device)
         mask[torch.arange(L), :, torch.arange(L), :] = 0
@@ -130,7 +129,7 @@ def main(
         chains=chains,
         log_weights=log_weights,
         tokens=tokens,
-        target_pearson=0.95,
+        target_pearson=target_pearson,
         pseudo_count=pseudocount,
         nsweeps=10,
         nepochs=500,
@@ -141,6 +140,7 @@ def main(
         drate=0.01,
         target_density=0.02,
         checkpoint=checkpoint,
+        gaps_fraction = gaps_fraction
     )
     
     

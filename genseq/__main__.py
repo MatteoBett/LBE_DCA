@@ -22,10 +22,11 @@ if __name__ == "__main__":
     family_dir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/data/input_test'
     outdir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output'
     model_type = "eaDCA"
-    run_generation = False
-    run_energy = False
+    run_generation = True
+    run_energy = True
     bias = True 
-    indel = False
+    indel = True
+    gaps_fraction = 0.15
     nchains = 2721
 
     for family_file, infile_path in dataset.family_stream(family_dir=family_dir):
@@ -39,11 +40,24 @@ if __name__ == "__main__":
         params_dca = os.path.join(family_outdir, "params.dat")
         weights_dca = os.path.join(family_outdir, "weights.dat")
 
+        
         if run_generation:
             if bias is True:
-                push.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias, nchains=nchains)
+                push.main(infile_path=infile_path, 
+                          outdir=family_outdir, 
+                          DCA_model_=model_type, 
+                          bias=bias, 
+                          nchains=nchains, 
+                          gaps_fraction=gaps_fraction,
+                          target_pearson=0.90)
             else:
-                push.main(infile_path=infile_path, outdir=family_outdir, DCA_model_=model_type, bias=bias, nchains=nchains)
+                push.main(infile_path=infile_path, 
+                          outdir=family_outdir, 
+                          DCA_model_=model_type, 
+                          bias=bias, 
+                          nchains=nchains, 
+                          gaps_fraction=gaps_fraction,
+                          target_pearson=0.90)
 
         
         if run_energy:

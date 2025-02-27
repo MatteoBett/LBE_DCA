@@ -1,10 +1,27 @@
-from typing import Dict, Callable
+from typing import Dict, Callable, Tuple
 
 import torch
 from torch.nn.functional import one_hot as one_hot_torch
 
 from genseq.tools.functional import one_hot
 
+@torch.jit.script
+def compute_gap_gradient(target_dist : torch.Tensor,
+                         dist_sample : torch.Tensor,
+                         params : Dict[str, torch.Tensor],
+                         learning_rate : float = 1,
+                         device : str = 'cuda'
+                         ) -> Dict[str, torch.Tensor]:
+    """
+    Computes the gradient of the bias applied to the gaps frequency and adjust it 
+    toward a target distribution of gaps corresponding to a mean frequency of gaps in the sequence.
+    """ 
+    target_dist = target_dist.to(device=device)
+    loss = target_dist - dist_sample
+    new_bias = learning_rate * loss# positive result
+    #print("loss: ",loss.shape, "target: ", target_dist.shape, "dist: ",dist_sample.shape, "new val", new_bias[:, 0].shape, "param", params["bias"][:, 0].shape)
+    params["bias"][:, 0] += new_bias[:, 0]
+    return params
 
 @torch.jit.script
 def _gibbs_sweep(
@@ -12,8 +29,9 @@ def _gibbs_sweep(
     residue_idxs: torch.Tensor,
     params: Dict[str, torch.Tensor],
     beta: float,
+    target_gaps_dist : torch.Tensor,
     gap_bias_flag: bool = False
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
     """Performs a Gibbs sweep over the chains.
 
     Args:
@@ -26,30 +44,36 @@ def _gibbs_sweep(
         torch.Tensor: Updated chains.
     """
     N, L, q = chains.shape
+    alloc_bias = torch.zeros((L, 1), device='cuda')
     for i in residue_idxs:
         # Select the couplings attached to the residue we are considering (i) and flatten along the other residues ({j})
         couplings_residue = params["coupling_matrix"][i].view(q, L * q)
         # Update the chains
         logit_residue = params["bias"][i].unsqueeze(0) + chains.reshape(N, L * q) @ couplings_residue.T # (N, q)
-    
-        if gap_bias_flag:
-            logit_residue = logit_residue.transpose(1, 0)
-            logit_residue[0] += 1
-            logit_residue = logit_residue.transpose(0, 1)
-
         make_proba = torch.softmax(beta*logit_residue, -1)
+
         sampled = torch.multinomial(make_proba, 1)
         chains[:, i, :] = one_hot(sampled, num_classes=q).to(logit_residue.dtype).squeeze(1)
+
+        alloc_bias[i] = make_proba[:, 0].mean()
+    
+    if gap_bias_flag:
+        params = compute_gap_gradient(
+            target_dist=target_gaps_dist,
+            dist_sample=alloc_bias,
+            params=params
+        )
         
-    return chains
+    return chains, params
 
 
 def gibbs_sampling(
     chains: torch.Tensor,
     params: Dict[str, torch.Tensor],
     nsweeps: int,
+    gaps_target : torch.Tensor,
     beta: float = 1.0,
-    gap_bias_flag: bool = False
+    gap_bias_flag: bool = False,
 ) -> torch.Tensor:
     """Gibbs sampling.
     
@@ -67,9 +91,9 @@ def gibbs_sampling(
     for t in torch.arange(nsweeps):
         # Random permutation of the residues
         residue_idxs = torch.randperm(L)
-        chains = _gibbs_sweep(chains, residue_idxs, params, beta, gap_bias_flag)
+        chains, params = _gibbs_sweep(chains, residue_idxs, params, beta, gaps_target, gap_bias_flag)
         
-    return chains
+    return chains, params
 
 
 def _get_deltaE(

@@ -61,6 +61,7 @@ class Checkpoint(ABC):
             "Entropy": 0.0,
             "Density": 0.0,
             "Time": 0.0,
+            "Gaps_freq":0.0
         }
         
         template = "{0:<20} {1:<50}\n"  
