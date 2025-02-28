@@ -12,13 +12,12 @@ from Bio import SeqIO
 def plot_energy_vs_gaps(base_outdir : str, path_save : str):
     """ Plots the statistical energy depending on the number of gaps """
     fig = plt.figure()
-    ax1, ax2, ax3 = fig.subplots(3, 1)
+    ax1, ax2 = fig.subplots(2, 1)
     fig.set_figheight(15)
 
     for x_vector, y_vector, nuc_count, _dir, length in load_seq(family_dir=base_outdir):
         ax1.scatter(x_vector, y_vector, marker='.', alpha=0.8)
         ax2.bar(list(nuc_count.keys()), list(nuc_count.values()), width=0.5, alpha=0.5, align='center', label=_dir)
-        ax3.bar(list(range(len(length))), length, label = _dir)
 
     ax1.set_xlabel("Number of gaps")
     ax1.set_ylabel("Statistical energy")
@@ -26,7 +25,6 @@ def plot_energy_vs_gaps(base_outdir : str, path_save : str):
 
     ax2.set_ylabel("Overall nucleotide count")
     ax2.set_title("Nucleotide's frequencies in generated VS data sequences")
-    ax3.set_title("sequence length distribution")
     
     plt.subplots_adjust(hspace=0.8)
     plt.legend(bbox_to_anchor=(1.1, 1.8))
@@ -57,21 +55,6 @@ def load_seq(family_dir : str):
         nuc_count = {key : val/total for key, val in nuc_count.items()}        
         yield gaps, energy, nuc_count, _dir, length
 
-def make_pdf_report(output_path : str, ):
-    pdf_report_path = os.path.join(output_path, "Report.pdf")
-    pdf = bpdf.PdfPages(pdf)
-
-    fig = plt.figure()
-    ax1, ax2 = fig.subplots(2, 1)
-    ax1, ax2 = plot_energy_vs_gaps(output_path)
-    fig.savefig(pdf, format='pdf')
-    
-    fig2 = plt.figure().subplots(2, 1)
-
-    plt.subplots_adjust(hspace=0.4)
-    plt.legend(bbox_to_anchor=(1.1, 2.8))
-    
-    pass
 
 def _plot_scatter_labels(
     ax: plt.Axes,

@@ -22,10 +22,10 @@ if __name__ == "__main__":
     family_dir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/data/input_test'
     outdir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output'
     model_type = "eaDCA"
-    run_generation = True
-    run_energy = True
+    run_generation = False
+    run_energy = False
     bias = True 
-    indel = True
+    indel = False
     gaps_fraction = 0.15
     nchains = 2721
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         chain_file = os.path.join(family_outdir, "chains.fasta")
         params_dca = os.path.join(family_outdir, "params.dat")
         weights_dca = os.path.join(family_outdir, "weights.dat")
-
+        energy_chains = os.path.join(family_outdir, "chains_energies.fasta")
         
         if run_generation:
             if bias is True:
@@ -49,7 +49,7 @@ if __name__ == "__main__":
                           bias=bias, 
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
-                          target_pearson=0.90)
+                          target_pearson=0.83)
             else:
                 push.main(infile_path=infile_path, 
                           outdir=family_outdir, 
@@ -57,13 +57,16 @@ if __name__ == "__main__":
                           bias=bias, 
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
-                          target_pearson=0.90)
+                          target_pearson=0.83)
 
         
         if run_energy:
             energies.main(dca_seq_path=chain_file, param_dca_path=params_dca, outdir=family_outdir)
 
         base_outdir = "/".join(family_outdir.split("/")[:-1])
-        display.plot_energy_vs_gaps(base_outdir=base_outdir, path_save=os.path.join(outdir, "figures", f"{family_file.split('.')[0]}.png"))
-        plot_ss.homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=indel)
-        plot_ss.heatmap_homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=indel)
+
+        if os.path.exists(energy_chains):      
+            plot_ss.homology_vs_gaps(chains_file=chain_file, infile_path=infile_path, bias=bias, indel=indel)
+        else:
+            print("Sequences energy is not available. Switching to normal chains. Energy will not be plotted")
+            plot_ss.homology_vs_gaps(chains_file=energy_chains, infile_path=infile_path, bias=bias, indel=indel)

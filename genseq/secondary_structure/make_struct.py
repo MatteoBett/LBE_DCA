@@ -26,6 +26,6 @@ def walk_seq(infile_path : str, genseqs_path : str, indel_mode : bool = False):
     for record in SeqIO.parse(genseqs_path, 'fasta'):
         tmp_struct, tmp_mfe = make_mfe(str(record.seq))
         dist = ss_distance(tmp_struct, consensus_ref)
-        yield record.seq, (mfe_ref, tmp_mfe), dist
+        yield record.seq, (mfe_ref, tmp_mfe), record.description
 
 
