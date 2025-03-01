@@ -37,6 +37,8 @@ def init_parameters(fi: torch.Tensor) -> Dict[str, torch.Tensor]:
     params = {}
     params["bias"] = torch.log(fi)
     params["coupling_matrix"] = torch.zeros((L, q, L, q), device=fi.device, dtype=fi.dtype)
+    params["gaps_bias"] = torch.zeros((L, 1), device=fi.device, dtype=fi.dtype)
+    params["gaps_lr"] = torch.tensor([0.001], device=fi.device, dtype=fi.dtype)
     return params
 
 

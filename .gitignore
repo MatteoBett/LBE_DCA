@@ -1,6 +1,8 @@
-./tmp
+/tmp
 **/__pycache__/
 .vscode/
 */old
-*/__pycache__
-./test
+/test
+output/sequences/test
+data
+genseq/__pycache__/

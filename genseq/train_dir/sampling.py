@@ -9,7 +9,6 @@ from genseq.tools.functional import one_hot
 def compute_gap_gradient(target_dist : torch.Tensor,
                          dist_sample : torch.Tensor,
                          params : Dict[str, torch.Tensor],
-                         learning_rate : float = 1,
                          device : str = 'cuda'
                          ) -> Dict[str, torch.Tensor]:
     """
@@ -18,9 +17,9 @@ def compute_gap_gradient(target_dist : torch.Tensor,
     """ 
     target_dist = target_dist.to(device=device)
     loss = target_dist - dist_sample
-    new_bias = learning_rate * loss# positive result
+    new_bias = params["gaps_lr"] * loss # positive result
     #print("loss: ",loss.shape, "target: ", target_dist.shape, "dist: ",dist_sample.shape, "new val", new_bias[:, 0].shape, "param", params["bias"][:, 0].shape)
-    params["bias"][:, 0] += new_bias[:, 0]
+    params["gaps_bias"][:, 0] += new_bias[:, 0]
     return params
 
 @torch.jit.script
