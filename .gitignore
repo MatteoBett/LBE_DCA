@@ -6,4 +6,4 @@
 output/sequences/test
 data
 genseq/__pycache__/
-data/
+/data/
