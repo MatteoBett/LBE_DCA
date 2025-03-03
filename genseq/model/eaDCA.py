@@ -112,12 +112,6 @@ def fit(
                                                           distrib=target_gap_distribution)
     
     print("Targetted average gap frequency",target_gap_distribution.mean())
-    """
-    plt.plot(list(range(len(fi_target_gap_distribution))), fi_target_gap_distribution, c='b', label='data')
-    plt.plot(list(range(len(fi_target_gap_distribution))), target_gap_distribution, c='r', label='target')
-    plt.show()
-    """
-
     graph_upd = 0
     density = compute_density(mask) * 100
     L, q = fi_target.shape
@@ -132,6 +126,8 @@ def fit(
     pi = get_freq_single_point(data=chains)
     pij = get_freq_two_points(data=chains)
     pearson = max(0, float(get_correlation_two_points(fij=fij_target, pij=pij, fi=fi_target, pi=pi)[0]))
+    
+    #print("pi gap freq eaDCA: ", pi[:, 0].mean())
     
     # Number of active couplings
     nactive = mask.sum()
@@ -152,7 +148,7 @@ def fit(
         
         # Compute the two-points frequencies of the simulated data with pseudo-count
         pij_Dkl = get_freq_two_points(data=chains, weights=None, pseudo_count=pseudo_count)
-        
+
         # Update the graph
         nactivate = int(((L**2 * q**2) - mask.sum().item()) * factivate)
         mask = activate_graph(

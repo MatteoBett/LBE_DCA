@@ -44,7 +44,7 @@ class DatasetDCA(Dataset):
         self.dtype = dtype
         
         # Select the proper encoding
-        self.tokens = get_tokens(alphabet) #-ACGU
+        self.tokens = get_tokens(alphabet) #-AUCG
         
         # Automatically detects if the file is in fasta format and imports the data
         with open(self.path_data, "r") as f:

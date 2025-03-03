@@ -59,7 +59,7 @@ def get_initial_states(msa : List[str]) -> torch.Tensor:
     
 
 
-def distributor(strategy : str) -> function:
+def distributor(strategy : str):
     if strategy == "mean":
         return get_mean_gaps_per_position
     elif strategy == "viterbi":

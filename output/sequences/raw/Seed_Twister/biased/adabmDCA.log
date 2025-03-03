@@ -1,0 +1,20 @@
+label:               N/A                                               
+model:               eaDCA                                             
+input MSA:           /home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/data/input_test/raw/Seed_Twister/Seed_Twister.fasta
+alphabet:            rna                                               
+sampler:             gibbs                                             
+nchains:             1613                                              
+nsweeps:             10                                                
+lr:                  0.05                                              
+target Pearson Cij:  0.8                                               
+gsteps:              10                                                
+factivate:           0.001                                             
+
+Epochs     Pearson    Slope      LL_train   LL_test    ESS        Entropy    Density    Time       Gaps_freq 
+10         0.212      0.028      -221.616   0.000      0.002      115.839    0.923      24.857     0.683     
+20         0.354      0.089      -194.521   0.000      0.004      80.947     1.250      49.180     0.656     
+30         0.434      0.221      -225.650   0.000      0.001      116.491    1.725      73.525     0.578     
+40         0.214      0.055      -186.723   0.000      0.001      -135.448   2.352      97.869     0.670     
+50         0.469      0.194      -243.628   0.000      0.001      149.080    2.435      122.268    0.586     
+60         0.351      0.148      -334.293   0.000      0.001      -105.771   2.790      146.689    0.682     
+70         0.344      0.173      -291.138   0.000      0.001      -129.436   3.073      171.564    0.665     

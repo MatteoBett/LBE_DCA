@@ -2,7 +2,10 @@ from pathlib import Path
 import numpy as np
 from typing import Tuple
 
+from collections import Counter
+
 import torch
+import torch.torch_version
 
 # Default alphabets
 TOKENS_PROTEIN = "-ACDEFGHIKLMNPQRSTVWY"
@@ -178,6 +181,29 @@ def write_fasta(
             f.write(seq)
             f.write('\n')
 
+def adjust_weights(
+    data: np.ndarray | torch.Tensor,
+    device: torch.device = torch.device("cpu"),
+    dtype: torch.dtype = torch.float32,
+) -> torch.Tensor:
+    """ 
+    Provide a regularization of the sequences weights by computing the euclidean 
+    """
+    data = data.to(device=device)
+    assert len(data.shape) == 2, "'data' must be a 2-dimensional array"
+    N, L = data.shape
+    q = len(data.unique())
+
+    alloc_refmat = torch.zeros((L, q), device=device, dtype=dtype)
+    for col in range(L):
+        dicol = Counter(data[:, col].tolist())
+        for key in dicol:
+            alloc_refmat[col, key] = dicol[key]
+
+    alloc_refmat = alloc_refmat / N
+    
+    return alloc_refmat
+
 
 def compute_weights(
     data: np.ndarray | torch.Tensor,
@@ -209,7 +235,6 @@ def compute_weights(
     def get_sequence_weight(s: torch.Tensor, data: torch.Tensor, L: int, th: float):
         seq_id = torch.sum(s == data, dim=1) / L
         n_clust = torch.sum(seq_id >= th)
-        
         return 1.0 / n_clust
 
     weights = torch.vstack([get_sequence_weight(s, data, L, th) for s in data])

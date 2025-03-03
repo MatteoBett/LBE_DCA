@@ -1,0 +1,16 @@
+label:               N/A                                               
+model:               eaDCA                                             
+input MSA:           /home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/data/input_test/raw/Twister_Ribozyme/Twister_Ribozyme.fasta
+alphabet:            rna                                               
+sampler:             gibbs                                             
+nchains:             1613                                              
+nsweeps:             10                                                
+lr:                  0.05                                              
+target Pearson Cij:  0.8                                               
+gsteps:              10                                                
+factivate:           0.001                                             
+
+Epochs     Pearson    Slope      LL_train   LL_test    ESS        Entropy    Density    Time       Gaps_freq 
+10         0.629      0.235      -54.059    0.000      0.897      63.174     0.546      39.648     0.134     
+20         0.762      0.473      -48.240    0.000      0.857      57.579     1.069      78.906     0.126     
+27         0.800      0.546      -45.918    0.000      0.838      55.902     1.379      103.598    0.119     

@@ -246,7 +246,7 @@ def extract_Cij_from_freq(
         Tuple[float, float]: Extracted two-point frequencies of the data and chains.
     """
     L = fi.shape[0]
-    
+        
     # Compute the covariance matrices
     cov_data = fij - torch.einsum('ij,kl->ijkl', fi, fi)
     cov_chains = pij - torch.einsum('ij,kl->ijkl', pi, pi)
@@ -256,11 +256,11 @@ def extract_Cij_from_freq(
         cov_data = torch.where(mask, cov_data, torch.tensor(0.0, device=cov_data.device, dtype=cov_data.dtype))
         cov_chains = torch.where(mask, cov_chains, torch.tensor(0.0, device=cov_chains.device, dtype=cov_chains.dtype))
     
+
     # Extract only the entries of half the matrix and out of the diagonal blocks
     idx_row, idx_col = torch.tril_indices(L, L, offset=-1)
     fij_extract = cov_data[idx_row, :, idx_col, :].reshape(-1)
     pij_extract = cov_chains[idx_row, :, idx_col, :].reshape(-1)
-    
     return fij_extract, pij_extract
 
 
@@ -312,7 +312,9 @@ def get_correlation_two_points(
     """
     
     fij_extract, pij_extract = extract_Cij_from_freq(fij, pij, fi, pi, mask)
-    pearson = torch.corrcoef(torch.stack([fij_extract, pij_extract]))[0, 1].item()
+    stack = torch.stack([fij_extract, pij_extract])
+    pearson = torch.corrcoef(stack)[0, 1].item()
+    
     slope = _get_slope(fij_extract, pij_extract).item()
     
     return pearson, slope

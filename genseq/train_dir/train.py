@@ -67,6 +67,8 @@ def main(
         device=device,
         dtype=dtype,
     )
+
+    #dataset.get_indels_info()
     
     DCA_model = importlib.import_module(f"genseq.model.{DCA_model_}")
     tokens = get_tokens(alphabet)
@@ -105,7 +107,9 @@ def main(
     print(f"Number of chains set to {nchains}.")
     chains = init_chains(num_chains=nchains, L=L, q=q, fi=fi_target, device=device, dtype=dtype)
     log_weights = torch.zeros(size=(nchains,), device=device, dtype=dtype)
-        
+    
+    pi_train = get_freq_single_point(chains)
+    print("pi_train gap freq: ", pi_train[:, 0].mean())
     # Select the sampling function
     sampler = get_sampler(MCMC_sampler)
     

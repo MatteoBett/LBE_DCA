@@ -2,11 +2,27 @@ import os
 from collections import Counter
 from typing import List
 
+from Bio import SeqIO
 import matplotlib.backends.backend_pdf as bpdf
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
 from Bio import SeqIO
+
+
+
+def get_summary(all_fam_dir : str):
+    template = "{0:<30} {1:<50}"
+    for path, directories, files in os.walk(all_fam_dir):
+        if files != []:
+            for f in files:
+                print(f.split('.')[0])
+                path_file = os.path.join(path, f)
+                seqs = Counter("".join([str(record.seq) for record in SeqIO.parse(path_file, 'fasta')]))
+                seqs = {key : val/sum(seqs.values()) for key, val in seqs.items()}
+
+                for key, freq in seqs.items():
+                    print(template.format(key, freq))
 
 
 def plot_energy_vs_gaps(base_outdir : str, path_save : str):

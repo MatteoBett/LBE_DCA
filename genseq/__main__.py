@@ -14,6 +14,7 @@ import torch
 from genseq.tools import dataset, energies
 import genseq.secondary_structure.make_struct as make_SS
 import genseq.display.plot_ss as plot_ss
+import genseq.display.plot as plot
 import genseq.train_dir.train as push
 
 """
@@ -34,23 +35,33 @@ if __name__ == "__main__":
     model_type = "eaDCA"
     run_generation = True
     run_energy = True
-    bias = False 
-    indel = False
-    do_one = False
+    bias = True 
+    indel = True
+    do_one = True
+    plotting = True
 
-    gaps_fraction = 0.15
-    nchains = 1613
+    nchains = 2720
+    target_pearson = 0.8 
+
+    if indel:
+        alphabet = '*-AUCG'
+        out = 'indel'
+        family_dir = os.path.join(family_dir, "indel")
+        gaps_fraction = 0.03
+    else:
+        alphabet = 'rna'
+        out = 'raw'
+        family_dir = os.path.join(family_dir, 'raw')
+        gaps_fraction = 0.15
+
+    plot.get_summary(family_dir)
 
     for family_file, infile_path in dataset.family_stream(family_dir=family_dir):
-        if indel:
-            alphabet = '*-ACGU'
-        else:
-            alphabet = 'rna'
-            
         if bias:
-            family_outdir = os.path.join(outdir, "sequences", family_file.split('.')[0], "biased")
+            family_outdir = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "biased")
         else:
-            family_outdir = os.path.join(outdir, "sequences", family_file.split('.')[0], "non_biased")
+            family_outdir = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "non_biased")
+        
         os.makedirs(family_outdir, exist_ok=True)
 
         chain_file = os.path.join(family_outdir, "chains.fasta")
@@ -66,7 +77,7 @@ if __name__ == "__main__":
                           bias=bias, 
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
-                          target_pearson=0.83,
+                          target_pearson=target_pearson,
                           alphabet=alphabet)
             else:
                 push.main(infile_path=infile_path, 
@@ -75,19 +86,31 @@ if __name__ == "__main__":
                           bias=bias, 
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
-                          target_pearson=0.83,
+                          target_pearson=target_pearson,
                           alphabet=alphabet)
 
-        
         if run_energy:
-            energies.main(dca_seq_path=chain_file, param_dca_path=params_dca, outdir=family_outdir)
+            energies.main(dca_seq_path=chain_file, param_dca_path=params_dca, outdir=family_outdir, alphabet=alphabet)
 
         base_outdir = "/".join(family_outdir.split("/")[:-1])
 
-        biased_seqs = os.path.join(outdir, "sequences", family_file.split('.')[0], "biased", "chains_energies.fasta")
-        unbiased_seqs = os.path.join(outdir, "sequences", family_file.split('.')[0], "non_biased", "chains_energies.fasta")
+        biased_seqs = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "biased", "chains_energies.fasta")
+        unbiased_seqs = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "non_biased", "chains_energies.fasta")
+
+        biased_params = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "biased", "params.dat")
+        unbiased_params = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "non_biased", "params.dat")
         
-        plot_ss.homology_vs_gaps(chains_file_ref=unbiased_seqs, infile_path=infile_path, chains_file_bias=biased_seqs,indel=indel, fig_dir=fig_dir)
+        if plotting:
+            fig_dir = os.path.join(fig_dir, family_file.split('.')[0])
+            os.makedirs(fig_dir, exist_ok=True)
+            plot_ss.homology_vs_gaps(chains_file_ref=unbiased_seqs, 
+                                     infile_path=infile_path, 
+                                     chains_file_bias=biased_seqs,
+                                     indel=indel, 
+                                     fig_dir=fig_dir,
+                                     params_path_unbiased=unbiased_params,
+                                     params_path_biased=biased_params,
+                                     alphabet=alphabet)
 
         if do_one:
             break

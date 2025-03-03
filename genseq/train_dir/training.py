@@ -77,7 +77,7 @@ def update_params(
     params: Dict[str, torch.Tensor],
     mask: torch.Tensor,
     lr: float,
-    gaps_bias_flag : bool = False
+    cancel_bias: bool = False
 ) -> Dict[str, torch.Tensor]:
     """Updates the parameters of the model.
     
@@ -93,10 +93,16 @@ def update_params(
     Returns:
         Dict[str, torch.Tensor]: Updated parameters.
     """
-    
+
+    if cancel_bias:
+        params["bias"][:, 0] -= params["gaps_bias"][:, 0]
+        return params
+        
     # Compute the gradient
     grad = compute_gradient_centred(fi=fi, fij=fij, pi=pi, pij=pij)
     
+    #grad["bias"][:, 0] += 2.5
+    #print(grad["bias"][:, 0].mean())
     # Update parameters
     with torch.no_grad():
         for key in params:
@@ -166,6 +172,9 @@ def train_graph(
     # Compute the single-point and two-points frequencies of the simulated data
     pi = get_freq_single_point(data=chains, weights=None, pseudo_count=0.)
     pij = get_freq_two_points(data=chains, weights=None, pseudo_count=0.)
+    
+    #print("fi target gap freq: ", fi[:,0].mean())
+    #print("pi training graph gap freq",pi[:,0].mean())
 
     def halt_condition(epochs, pearson, slope, check_slope):
         c1 = pearson < target_pearson
@@ -201,7 +210,6 @@ def train_graph(
         pbar.set_description(f"Epochs: {epochs} - train LL: {log_likelihood:.2f}")
 
     while not halt_condition(epochs, pearson, slope, check_slope):
-        
         # Store the previous parameters
         params_prev = {key: value.clone() for key, value in params.items()}
         # Update the parameters
@@ -213,7 +221,7 @@ def train_graph(
             params=params,
             mask=mask,
             lr=lr,
-            gaps_bias_flag=gap_bias_flag
+            cancel_bias=False
         )
 
         # Compute the weights for the AIS
@@ -226,13 +234,17 @@ def train_graph(
                 
         # Update the Markov chains
         chains, params = sampler(chains=chains, params=params, nsweeps=nsweeps, gap_bias_flag=gap_bias_flag, gaps_target=gaps_target)
+
         epochs += 1
         # Compute the single-point and two-points frequencies of the simulated data
         pi = get_freq_single_point(data=chains)            
         pij = get_freq_two_points(data=chains)
+
+        #print("pi gap freq in train graph loop: ", pi[:,0].mean())
         pearson, slope = get_correlation_two_points(fij=fij, pij=pij, fi=fi, pi=pi)
         logZ = (torch.logsumexp(log_weights, dim=0) - torch.log(torch.tensor(len(chains), device=device, dtype=dtype))).item()
         log_likelihood = compute_log_likelihood(fi=fi, fij=fij, params=params, logZ=logZ)
+
 
         if progress_bar:
             pbar.n = min(max(0, float(pearson)), target_pearson)
@@ -240,6 +252,7 @@ def train_graph(
             
         # Save the model if a checkpoint is reached
         if checkpoint is not None:
+            print(len(chains))
             if checkpoint.check(epochs, params, chains):
                 entropy = compute_entropy(chains=chains, params=params, logZ=logZ)
                 ess = _compute_ess(log_weights)

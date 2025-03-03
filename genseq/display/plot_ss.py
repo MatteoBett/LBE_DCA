@@ -11,13 +11,14 @@ import numpy as np
 
 import genseq.tools.stats as stats
 import genseq.tools.utils as utils
+import genseq.tools.io as io
 from genseq.tools.dataset import load_msa, DatasetDCA
 from genseq.secondary_structure.make_struct import walk_seq
 
 sns.set_theme('paper')
 
 def kde_boxplot(df : pd.DataFrame, df_col : List[str], indel : str, freq : pd.DataFrame, fig_dir : str):
-    path_pdf = os.path.join(fig_dir, f'EDA{indel}.pdf')
+    path_pdf = os.path.join(fig_dir, f'EDA_{indel}.pdf')
     pdf = bpdf.PdfPages(path_pdf)
 
     for col in df_col:
@@ -71,42 +72,48 @@ def homology_vs_gaps(chains_file_ref : str,
                      infile_path : str,
                      chains_file_bias : str,
                      fig_dir : str,
-                     indel : bool = False):
+                     params_path_unbiased : str,
+                     params_path_biased : str,
+                     indel : bool = False,
+                     alphabet : str = 'rna'
+                     ):
     """ Computes the variation of homology depending on the number of gaps in the sequence """
     if indel:
-        index = DatasetDCA(infile_path, alphabet='rna').get_indels(threshold_method="mean")
-        indel = "_indel"
+        index = DatasetDCA(infile_path, alphabet=alphabet).get_indels(threshold_method="mean")
+        indel = "indel"
+        char = '*'
     else:
-        indel = "_gaps"
+        indel = "gaps"
+        char = '-'
 
     df_dico = {'D_MFE' : [], 'ngaps':[], "energy" : [], 'generated' : []}
     freq_gen = Counter()
     freq_data = Counter()
     freq_ref = Counter()
     for seq, (ref_mfe, tmp_mfe), description in walk_seq(infile_path=infile_path, genseqs_path=chains_file_ref):
-        if indel == "_indel":
+        if indel == "indel":
             seq = "".join([seq[i] for i in index])
         freq_gen += Counter(str(seq))
-        df_dico['ngaps'].append(str(seq).count('-'))
+        df_dico['ngaps'].append(str(seq).count(char))
         df_dico['D_MFE'].append(round(ref_mfe-tmp_mfe, 3))
         df_dico['energy'].append(round(float(description.split('DCAenergy: ')[1].strip()), 3))
         df_dico['generated'].append('yes_unbiased')
     
     for seq, (ref_mfe, tmp_mfe), description in walk_seq(infile_path=infile_path, genseqs_path=infile_path):
-        if indel == "_indel":
+        if indel == "indel":
             seq = "".join([seq[i] for i in index])
         freq_ref += Counter(str(seq))
-        df_dico['ngaps'].append(str(seq).count('-'))
+        df_dico['ngaps'].append(str(seq).count(char))
         df_dico['D_MFE'].append(round(ref_mfe-tmp_mfe, 3))
         df_dico['energy'].append(0)
 
         df_dico['generated'].append('no')
 
     for seq, (ref_mfe, tmp_mfe), description in walk_seq(infile_path=infile_path, genseqs_path=chains_file_bias):
-        if indel == "_indel":
+        if indel == "indel":
             seq = "".join([seq[i] for i in index])
         freq_data += Counter(str(seq))
-        df_dico['ngaps'].append(str(seq).count('-'))
+        df_dico['ngaps'].append(str(seq).count(char))
         df_dico['D_MFE'].append(round(ref_mfe-tmp_mfe, 3))
         df_dico['energy'].append(round(float(description.split('DCAenergy: ')[1].strip()), 3))
         df_dico['generated'].append('yes_biased')
@@ -115,20 +122,30 @@ def homology_vs_gaps(chains_file_ref : str,
     df_freq = pd.DataFrame(data=[freq_gen,freq_ref, freq_data]).apply(lambda x : x.apply(lambda y : y/x.sum() ), axis=1)
     df_freq["generated"] = ['yes_unbiased', 'no','yes_biased']
     pdf = kde_boxplot(df, df.columns,indel=indel, freq=df_freq, fig_dir=fig_dir)
-    gaps_coupling_heatmap(chains_file_ref=chains_file_ref, infile_path=infile_path, chains_file_bias=chains_file_bias, pdf=pdf)
+    gap_coupling_heatmap(params_path_unbiased=params_path_unbiased, 
+                         params_path_biased=params_path_biased,
+                         pdf=pdf, 
+                         char=char, 
+                         alphabet=alphabet)
+    gaps_freq_heatmap(chains_file_ref=chains_file_ref, infile_path=infile_path, chains_file_bias=chains_file_bias, pdf=pdf,char=char, alphabet=alphabet)
 
     pdf.close()
 
-def gaps_coupling_heatmap(
+def gaps_freq_heatmap(
                      chains_file_ref : str, 
                      infile_path : str,
                      chains_file_bias : str,
-                     pdf):
-    translate = {0: '-', 1: 'A', 2: 'C', 3: 'G', 4: 'U'}
+                     pdf,
+                     char : str,
+                     alphabet : str = 'rna'):
+    if alphabet == 'rna':
+        translate = {0: '-', 1: 'A', 2: 'U', 3: 'C', 4: 'G'}
+    else:
+        translate = {0:'*', 1:'-', 2:'A', 3:'U', 4:'C', 5:'G'}
 
-    dataset_ref = DatasetDCA(infile_path, alphabet='rna')
-    dataset_biased = DatasetDCA(chains_file_bias, alphabet='rna')
-    dataset_unbiased = DatasetDCA(chains_file_ref, alphabet='rna')
+    dataset_ref = DatasetDCA(infile_path, alphabet=alphabet)
+    dataset_biased = DatasetDCA(chains_file_bias, alphabet=alphabet)
+    dataset_unbiased = DatasetDCA(chains_file_ref, alphabet=alphabet)
 
     seqref, wref = utils.one_hot(dataset_ref.data), dataset_ref.weights
     seqbiased, wbiased = utils.one_hot(dataset_biased.data), dataset_biased.weights
@@ -145,9 +162,9 @@ def gaps_coupling_heatmap(
     sns.heatmap(f2p_ref[:, 0, :, 0], cmap="magma", cbar=True, ax=axes[1], vmax=1, vmin=0)
     sns.heatmap(f2p_biased[:, 0, :, 0], cmap="magma", cbar=True, ax=axes[2], vmax=1, vmin=0)
 
-    axes[0].set_title("Unbiased generated gaps' couplings")
-    axes[1].set_title("Reference data gaps' couplings")
-    axes[2].set_title("Biased generated data gaps' couplings")
+    axes[0].set_title("Unbiased generated gaps' frequency")
+    axes[1].set_title("Reference data gaps' frequency")
+    axes[2].set_title("Biased generated data gaps' frequency")
     
     fig.subplots_adjust(wspace=0.2)
     fig.savefig(pdf, format='pdf')
@@ -156,19 +173,68 @@ def gaps_coupling_heatmap(
     dico_f2p = dict(zip(["Unbiased", 'ref', "biased"],[f2p_unbiased, f2p_ref, f2p_biased]))
     
     for name, f2p in dico_f2p.items():
-        fig, axes = plt.subplots(1, 4, figsize=(19, 5))
+        fig, axes = plt.subplots(1, len(translate) - 1, figsize=(19, 5))
         for i in range(1, q):
             sns.heatmap(f2p[:, 0, :, i], cmap="magma", cbar=True, ax=axes[i-1], vmin=0, vmax=1)
-            axes[i-1].set_title(f"Coupling heatmap -/{translate[i]}")
+            axes[i-1].set_title(f"Frequency heatmap {char}/{translate[i]}")
             axes[i-1].set_xlabel(f"{translate[i]} Position")
             axes[i-1].set_ylabel(f"Gaps (-) position")
 
-            fig.suptitle(f'Couplings heatmap for {name}', fontsize=16, fontweight='bold')
+            fig.suptitle(f'Frequency heatmap for {name}', fontsize=16, fontweight='bold')
 
         fig.tight_layout()
         fig.subplots_adjust(wspace=0.2)
         fig.savefig(pdf, format='pdf')
         plt.close(fig)
+
+def gap_coupling_heatmap(
+                        params_path_unbiased : str,
+                        params_path_biased : str,
+                        pdf,
+                        char : str,
+                        alphabet : str = 'rna'):
+        
+    if alphabet == 'rna':
+        translate = {0: '-', 1: 'A', 2: 'U', 3: 'C', 4: 'G'}
+    else:
+        translate = {0:'*', 1:'-', 2:'A', 3:'U', 4:'C', 5:'G'}
+    
+    params_unbiased = io.load_params(fname=params_path_unbiased, tokens="".join(list(translate.values())), device='cpu')["coupling_matrix"]
+    params_biased = io.load_params(fname=params_path_biased, tokens="".join(list(translate.values())), device='cpu')["coupling_matrix"]
+
+    L, q, L, q = params_biased.shape
+
+    fig, axes = plt.subplots(1, 2, figsize=(18, 5))
+    sns.heatmap(params_unbiased[:, 0, :, 0] + params_unbiased[:, 1, :, 1] , cmap="magma", cbar=True, ax=axes[0])
+    sns.heatmap(params_biased[:, 0, :, 0] + params_biased[:, 1, :, 1], cmap="magma", cbar=True, ax=axes[1])
+
+    axes[0].set_title("Unbiased generated gaps' couplings")
+    axes[1].set_title("Biased generated data gaps' couplings")
+    
+    fig.suptitle(f'Couplings heatmap for -/-', fontsize=16, fontweight='bold')
+    fig.subplots_adjust(wspace=0.2)
+    fig.savefig(pdf, format='pdf')
+    plt.close(fig)
+    dico_params = dict(zip(["Unbiased", "biased"],[params_unbiased, params_biased]))
+    
+    for name, params in dico_params.items():
+        fig, axes = plt.subplots(1, len(translate) - 1, figsize=(19, 5))
+        mean_J = params[:, 0, :, 0:q-1].mean()
+        for i in range(1, q):
+            sns.heatmap(params[:, 0, :, i]-mean_J, cmap="magma", cbar=True, ax=axes[i-1])
+            axes[i-1].set_title(f"Coupling heatmap {char}/{translate[i]}")
+            axes[i-1].set_xlabel(f"{translate[i]} Position")
+            axes[i-1].set_ylabel(f"Gaps (-) position")
+
+            fig.suptitle(f'Couplings heatmap for {name}', fontsize=16, fontweight='bold')
+        
+
+        fig.tight_layout()
+        fig.subplots_adjust(wspace=0.2)
+        fig.savefig(pdf, format='pdf')
+        plt.close(fig)
+
+
 
 def heatmap_homology_vs_gaps(chains_file : str, 
                             infile_path : str,
