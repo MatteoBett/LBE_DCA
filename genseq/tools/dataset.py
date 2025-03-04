@@ -121,10 +121,11 @@ class DatasetDCA(Dataset):
 
     def get_indels_info(self):
         mat_msa = load_msa(self.path_data, format='matrix').T.tolist()
-        count_gaps = {index : col.count('-') for index, col in enumerate(mat_msa)}
+        count_gaps = {index : col.count('-') + col.count('*') for index, col in enumerate(mat_msa)}
         mean = np.mean(list(count_gaps.values()))
         median = np.mean(list(count_gaps.values()))
         
+        return count_gaps, mean
         plt.plot(list(range(len(count_gaps))),count_gaps.values())
         plt.hlines([mean, median], xmin = 0, xmax=len(count_gaps), label=["mean", "median"], colors=['red', 'blue'])
         plt.show()

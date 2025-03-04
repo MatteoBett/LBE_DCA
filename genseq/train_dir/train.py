@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import importlib
+from typing import Tuple
 
 import torch
 
@@ -30,7 +31,8 @@ def main(
         gsteps : int =10,
         drate : float =0.01,
         target_density : float=0.02,
-        gaps_fraction : float = 0.15):
+        gaps_fraction : Tuple[float, float] = (0.0,0.0),
+        cluster_th : float = 0.92):
     args = locals()
 
     print("\n" + "".join(["*"] * 10) + f" Training {DCA_model_} model " + "".join(["*"] * 10) + "\n")
@@ -66,6 +68,8 @@ def main(
         alphabet=alphabet,
         device=device,
         dtype=dtype,
+        no_reweighting=False,
+        clustering_th=cluster_th
     )
 
     #dataset.get_indels_info()

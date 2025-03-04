@@ -207,7 +207,7 @@ def adjust_weights(
 
 def compute_weights(
     data: np.ndarray | torch.Tensor,
-    th: float = 0.8,
+    th: float = 0.3,
     device: torch.device = torch.device("cpu"),
     dtype: torch.dtype = torch.float32,
 ) -> torch.Tensor:

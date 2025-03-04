@@ -106,12 +106,13 @@ def update_params(
     # Update parameters
     with torch.no_grad():
         for key in params:
-            if key == "gaps_bias" or key == "gaps_lr":
+            if key == "gaps_bias" or key == "gaps_lr" or key == "all_params":
                 continue
             params[key] += lr * grad[key]
         params["coupling_matrix"] *= mask # Remove autocorrelations
         params["bias"][:, 0] += params["gaps_bias"][:, 0]
         params["gaps_lr"] = params["gaps_lr"]*(1-0.0033)
+        params["all_params"][:, 0] += params["gaps_bias"][:, 0] 
 
     return params
 

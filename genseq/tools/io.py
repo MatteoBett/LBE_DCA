@@ -103,7 +103,8 @@ def load_params(
     
     param_labels = pd.read_csv(fname, sep=" ", usecols=[0,]).to_numpy()
     skiprows = (param_labels == "J").sum() + 1
-    skipfooter = len(param_labels) - skiprows + 1
+    skipfooter = len(param_labels) - skiprows +1
+    skipfoot_b = (param_labels == "b").sum()+1
 
     df_J = pd.read_csv(
         fname,
@@ -112,13 +113,22 @@ def load_params(
         skipfooter=skipfooter,
         engine="python"
     ).astype({"idx0" : int, "idx1" : int, "idx2" : str, "idx3" : str, "val" : float})
-    
+
     df_h = pd.read_csv(
         fname,
         sep=" ",
         names=["param", "idx0", "idx1", "val"],
-        skiprows=skiprows
+        skiprows=skiprows,
+        skipfooter=skipfoot_b,
+        engine='python'
     ).astype({"idx0" : int, "idx1" : str, "val" : float})
+
+    df_b = pd.read_csv(
+        fname,
+        sep=" ",
+        names=["param", "index", "val"],
+        skiprows=skiprows + (param_labels == "h").sum()
+    )
     
     # Convert from amino acid format to numeric format
     tokens = get_tokens(tokens)
@@ -126,11 +136,12 @@ def load_params(
     df_J["idx2"] = encode_sequence(df_J["idx2"].to_numpy(), tokens=tokens)
     df_J["idx3"] = encode_sequence(df_J["idx3"].to_numpy(), tokens=tokens)
     df_h["idx1"] = encode_sequence(df_h["idx1"].to_numpy(), tokens=tokens)
-    
 
     h_idx = df_h.loc[:, ["idx0", "idx1"]].to_numpy()
+
     L, q = h_idx.max(0) + 1
     h_val = df_h.loc[:, "val"].to_numpy()
+    b_val = df_b.loc[:, "val"].to_numpy()
 
     h = np.zeros(shape=(L * q,))
     h_idx_flat = h_idx @ np.array([q, 1])
@@ -151,6 +162,7 @@ def load_params(
     return {
         "bias" : torch.tensor(h, dtype=dtype, device=device),
         "coupling_matrix" : torch.tensor(J, dtype=dtype, device=device),
+        "gaps_bias": torch.tensor(b_val, device=device, dtype=dtype)
         }
 
 
@@ -179,9 +191,9 @@ def save_params(
     df_h = pd.DataFrame(
         {
             "param" : np.full(L * q, "h"),
-            "idx0" : idx0,
-            "idx1" : idx1_aa,
-            "idx2" : params["bias"].flatten(),
+            "index" : idx0,
+            "nuc" : idx1_aa,
+            "val" : params["bias"].flatten(),
         }
     )
     
@@ -202,8 +214,18 @@ def save_params(
             "val" : J_val,
         }
     )
+
+    df_b = pd.DataFrame(
+        {
+            "param" : np.full(L, "b"),
+            "index" : np.arange(L, dtype=np.int32),
+            "val" : params["all_params"].flatten(),
+        }
+    )
+    
     df_J.to_csv(fname, sep=" ", header=False, index=False)
     df_h.to_csv(fname, sep=" ", header=False, index=False, mode="a")
+    df_b.to_csv(fname, sep=" ", header=False, index=False, mode='a')
     
     
 def load_params_oldformat(

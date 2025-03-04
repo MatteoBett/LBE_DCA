@@ -5,24 +5,28 @@ import torch
 
 from genseq.tools.functional import one_hot
 
-
 @torch.jit.script
 def _compute_energy_sequence(
     x: torch.Tensor,
     params: Dict[str, torch.Tensor],
+    generate : bool
 ) -> torch.Tensor:
     L, q = params["bias"].shape
     x_oh = x.ravel()
-    bias_oh = params["bias"].ravel()
+    if generate:
+        params["bias"][:, 0] -= params['gaps_bias']
+    bias_oh = params["bias"].ravel()    
     couplings_oh = params["coupling_matrix"].view(L * q, L * q)
-    energy = - x_oh @ bias_oh - 0.5 * x_oh @ (couplings_oh @ x_oh)
-    
+    field = - x_oh @ bias_oh
+    couplings = - 0.5 * x_oh @ (couplings_oh @ x_oh)
+    energy =  field + couplings
     return energy
 
 
 def compute_energy(
     X: torch.Tensor,
     params: Dict[str, torch.Tensor],
+    generate : bool = False
 ) -> torch.Tensor:
     """Compute the DCA energy of the sequences in X.
     
@@ -37,7 +41,7 @@ def compute_energy(
     if X.dim() != 3:
         raise ValueError("Input tensor X must be 3-dimensional of size (_, L, q)")
     
-    return torch.vmap(_compute_energy_sequence, in_dims=(0, None))(X, params)
+    return torch.vmap(_compute_energy_sequence, in_dims=(0, None, None))(X, params, generate)
 
 
 def _update_weights_AIS(

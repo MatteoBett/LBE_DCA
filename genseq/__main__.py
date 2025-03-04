@@ -36,23 +36,32 @@ if __name__ == "__main__":
     run_generation = True
     run_energy = True
     bias = True 
+    double_bias = False
     indel = True
     do_one = True
     plotting = True
 
     nchains = 2720
-    target_pearson = 0.8 
+    target_pearson = 0.94
+
+    if double_bias:
+        assert not bias, "Simple and Double bias cannot be considered at the same time!"
 
     if indel:
         alphabet = '*-AUCG'
         out = 'indel'
         family_dir = os.path.join(family_dir, "indel")
-        gaps_fraction = 0.03
+        gaps_fraction = (0, 0.03)
+    elif double_bias:
+        alphabet = '*-AUCG'
+        out = 'double'
+        family_dir = os.path.join(family_dir, "double")
+        gaps_fraction = (0.15, 0.03)
     else:
         alphabet = 'rna'
         out = 'raw'
         family_dir = os.path.join(family_dir, 'raw')
-        gaps_fraction = 0.15
+        gaps_fraction = (0.15, 0)
 
     plot.get_summary(family_dir)
 

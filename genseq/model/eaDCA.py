@@ -1,6 +1,6 @@
 import time
 from tqdm import tqdm
-from typing import Callable
+from typing import Callable, Tuple
 
 import torch
 import numpy as np
@@ -69,7 +69,7 @@ def fit(
     gsteps: int,
     gap_bias_flag: bool,
     checkpoint: Checkpoint | None = None,
-    gaps_fraction : float = 0.25,
+    gaps_fraction : Tuple[float, float] = (0.0, 0.0),
     *args, **kwargs,
 ) -> None:
     """
@@ -100,6 +100,7 @@ def fit(
     if chains.dim() != 3:
         raise ValueError("chains must be a 3D tensor")
     
+    gap_bias, del_bias = gaps_fraction
     device = fi_target.device
     dtype = fi_target.dtype
     checkpoint.checkpt_interval = 10 # Save the model every 10 graph updates
@@ -107,11 +108,18 @@ def fit(
     
     fi_target_gap_distribution = fi_target[:, 0].cpu()
     target_gap_distribution = torch.zeros((len(fi_target_gap_distribution), 1), dtype=torch.float32).cpu()
-    target_gap_distribution = get_target_gap_distribution(frac_target=gaps_fraction, 
+
+    target_gap_distribution = get_target_gap_distribution(frac_target=gaps_fraction[0], 
+                                                          data_distrib=fi_target_gap_distribution, 
+                                                          distrib=target_gap_distribution)
+    
+    target_del_distribution = get_target_gap_distribution(frac_target=gaps_fraction[1], 
                                                           data_distrib=fi_target_gap_distribution, 
                                                           distrib=target_gap_distribution)
     
     print("Targetted average gap frequency",target_gap_distribution.mean())
+    print("Targetted average gap frequency",target_del_distribution.mean())
+
     graph_upd = 0
     density = compute_density(mask) * 100
     L, q = fi_target.shape

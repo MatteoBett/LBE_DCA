@@ -3,14 +3,19 @@ model:               eaDCA
 input MSA:           /home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/data/input_test/raw/Twister_Ribozyme/Twister_Ribozyme.fasta
 alphabet:            rna                                               
 sampler:             gibbs                                             
-nchains:             1613                                              
+nchains:             2720                                              
 nsweeps:             10                                                
 lr:                  0.05                                              
-target Pearson Cij:  0.8                                               
+target Pearson Cij:  0.94                                              
 gsteps:              10                                                
 factivate:           0.001                                             
 
 Epochs     Pearson    Slope      LL_train   LL_test    ESS        Entropy    Density    Time       Gaps_freq 
-10         0.629      0.235      -54.059    0.000      0.897      63.174     0.546      7.933      0.134     
-20         0.762      0.473      -48.240    0.000      0.857      57.571     1.069      15.334     0.126     
-27         0.801      0.546      -45.920    0.000      0.838      55.899     1.375      19.972     0.119     
+10         0.828      0.514      -49.428    0.000      0.732      54.417     0.885      8.625      0.141     
+20         0.900      0.737      -45.834    0.000      0.679      48.310     1.214      16.686     0.150     
+30         0.916      0.802      -44.018    0.000      0.651      45.833     1.344      24.782     0.151     
+40         0.925      0.828      -42.904    0.000      0.619      44.285     1.464      32.836     0.150     
+50         0.929      0.863      -42.138    0.000      0.579      42.593     1.599      40.900     0.149     
+60         0.936      0.871      -41.468    0.000      0.547      41.810     1.715      48.965     0.151     
+70         0.938      0.858      -40.947    0.000      0.534      41.234     1.762      57.156     0.149     
+72         0.940      0.867      -40.884    0.000      0.532      41.084     1.768      58.366     0.148     

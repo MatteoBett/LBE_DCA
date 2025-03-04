@@ -40,7 +40,7 @@ def main(dca_seq_path : str,
     q = params["bias"].shape[1]
     data = one_hot(data, num_classes=q).to(dtype)
     print(f"Computing DCA energies...")
-    energies = compute_energy(data, params).cpu().numpy()
+    energies = compute_energy(data, params, generate=True).cpu().numpy()
     
     # Save results in a file
     print("Saving results...")
