@@ -1,4 +1,4 @@
-import os, sys
+import os, sys, re
 from typing import List
 from collections import Counter
 
@@ -77,7 +77,8 @@ def homology_vs_gaps(chains_file_ref : str,
                      params_path_unbiased : str,
                      params_path_biased : str,
                      indel : bool = False,
-                     alphabet : str = 'rna'
+                     alphabet : str = 'rna',
+                     double : bool = False
                      ):
     """ Computes the variation of homology depending on the number of gaps in the sequence """
     if indel:
@@ -88,6 +89,9 @@ def homology_vs_gaps(chains_file_ref : str,
         indel = "gaps"
         char = '-'
 
+    if double:
+        alphabet = 'rna'
+        
     df_dico = {'D_MFE' : [], 'ngaps':[], "energy" : [], 'generated' : []}
     freq_unbias = Counter()
     freq_bias = Counter()
@@ -104,7 +108,6 @@ def homology_vs_gaps(chains_file_ref : str,
         df_dico['ngaps'].append(str(seq).count(char))
         df_dico['D_MFE'].append(round(ref_mfe-tmp_mfe, 3))
         df_dico['energy'].append(0)
-
         df_dico['generated'].append('no')
     print(freq_ref)
     for seq, (ref_mfe, tmp_mfe), description in walk_seq(infile_path=infile_path, genseqs_path=chains_file_bias):
@@ -114,10 +117,11 @@ def homology_vs_gaps(chains_file_ref : str,
         df_dico['energy'].append(round(float(description.split('DCAenergy: ')[1].strip()), 3))
         df_dico['generated'].append('yes_biased')
 
+    print(len(df_dico['ngaps']), len(df_dico['D_MFE']))
     df = pd.DataFrame(data=df_dico, index=list(range(len(df_dico['ngaps']))))
     df_freq = pd.DataFrame(data=[freq_unbias,freq_ref, freq_bias]).apply(lambda x : x.apply(lambda y : y/x.sum() ), axis=1)
     df_freq["generated"] = ['yes_unbiased', 'no','yes_biased']
-    
+
     if 'N' in df_freq:
         df_freq = df_freq.drop('N', axis=1)
     print(df_freq)
@@ -126,8 +130,14 @@ def homology_vs_gaps(chains_file_ref : str,
                          params_path_biased=params_path_biased,
                          pdf=pdf, 
                          char=char, 
-                         alphabet=alphabet)
-    gaps_freq_heatmap(chains_file_ref=chains_file_ref, infile_path=infile_path, chains_file_bias=chains_file_bias, pdf=pdf,char=char, alphabet=alphabet)
+                         alphabet=alphabet,
+                         double=double)
+    gaps_freq_heatmap(chains_file_ref=chains_file_ref, 
+                      infile_path=infile_path, 
+                      chains_file_bias=chains_file_bias, 
+                      pdf=pdf,char=char, 
+                      alphabet=alphabet,
+                      double=double)
 
     pdf.close()
 
@@ -137,16 +147,22 @@ def gaps_freq_heatmap(
                      chains_file_bias : str,
                      pdf,
                      char : str,
-                     alphabet : str = 'rna'):
+                     alphabet : str = 'rna',
+                     double : bool = False):
+    
+    
     if alphabet == 'rna':
         translate = {0: '-', 1: 'A', 2: 'U', 3: 'C', 4: 'G'}
     else:
         translate = {0:'*', 1:'-', 2:'A', 3:'U', 4:'C', 5:'G'}
 
+    if double:
+        infile_path = re.sub("indel", 'raw', infile_path)
+
     dataset_ref = DatasetDCA(infile_path, alphabet=alphabet)
     dataset_biased = DatasetDCA(chains_file_bias, alphabet=alphabet)
     dataset_unbiased = DatasetDCA(chains_file_ref, alphabet=alphabet)
-
+    
     fig, axes = plt.subplots(1, 1, figsize=(18,5))
     ref_count_gaps, mean_ref = dataset_ref.get_indels_info()
     biased_count_gaps, mean_bias = dataset_biased.get_indels_info()
@@ -212,7 +228,8 @@ def gap_coupling_heatmap(
                         params_path_biased : str,
                         pdf,
                         char : str,
-                        alphabet : str = 'rna'):
+                        alphabet : str = 'rna',
+                        double : bool = False):
         
     if alphabet == 'rna':
         translate = {0: '-', 1: 'A', 2: 'U', 3: 'C', 4: 'G'}
@@ -225,12 +242,25 @@ def gap_coupling_heatmap(
     L, q, L, q = params_biased.shape
 
     fig, axes = plt.subplots(1, 2, figsize=(18, 5))
-    sns.heatmap(params_unbiased[:, 0, :, 0], cmap="magma", cbar=True, ax=axes[0], 
-                vmin=min([params_unbiased[:, 0, :, 0].min(), params_biased[:, 0, :, 0].min()]),
-                vmax=max([params_unbiased[:, 0, :, 0].max(), params_biased[:, 0, :, 0].max()]))
-    sns.heatmap(params_biased[:, 0, :, 0], cmap="magma", cbar=True, ax=axes[1], 
-                vmin=min([params_unbiased[:, 0, :, 0].min(), params_biased[:, 0, :, 0].min()]),
-                vmax=max([params_unbiased[:, 0, :, 0].max(), params_biased[:, 0, :, 0].max()]))
+    if double:
+        tot = params_unbiased[:, 0, :, 0] + params_unbiased[:, 1, :, 1] + params_unbiased[:, 0, :, 1] + params_unbiased[:, 1, :, 0]
+        sns.heatmap(tot, cmap="magma", cbar=True, ax=axes[0], 
+                    vmin=min([tot.min(), tot.min()]),
+                    vmax=max([tot.max(), tot.max()]))
+    else:
+        sns.heatmap(params_unbiased[:, 0, :, 0] , cmap="magma", cbar=True, ax=axes[0], 
+            vmin=min([params_unbiased[:, 0, :, 0].min(), params_biased[:, 0, :, 0].min()]),
+            vmax=max([params_unbiased[:, 0, :, 0].max(), params_biased[:, 0, :, 0].max()]))
+    
+    if double:
+        tot_bias = params_biased[:, 0, :, 0] + params_biased[:, 1, :, 1] + params_biased[:, 0, :, 1] + params_biased[:, 1, :, 0]
+        sns.heatmap(tot_bias, cmap="magma", cbar=True, ax=axes[1], 
+                    vmin=min([tot_bias.min(), tot_bias.min()]),
+                    vmax=max([tot_bias.max(), tot_bias.max()]))
+    else:
+        sns.heatmap(params_biased[:, 0, :, 0], cmap="magma", cbar=True, ax=axes[1], 
+                    vmin=min([params_unbiased[:, 0, :, 0].min(), params_biased[:, 0, :, 0].min()]),
+                    vmax=max([params_unbiased[:, 0, :, 0].max(), params_biased[:, 0, :, 0].max()]))        
 
     axes[0].set_title("Unbiased generated gaps' couplings")
     axes[1].set_title("Biased generated data gaps' couplings")

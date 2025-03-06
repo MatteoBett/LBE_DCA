@@ -12,8 +12,11 @@ from genseq.tools.statmech import compute_energy
 def main(dca_seq_path : str, 
          param_dca_path : str, 
          outdir : str,
-         alphabet: str = 'rna'):
+         alphabet: str = 'rna',
+         double: bool = False):
     
+    if double:
+        alphabet = 'rna'
     print("\n" + "".join(["*"] * 10) + f" Computing DCA energies " + "".join(["*"] * 10) + "\n")
     
     # Set the device

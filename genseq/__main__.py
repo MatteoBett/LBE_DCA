@@ -33,35 +33,40 @@ if __name__ == "__main__":
     outdir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output'
     fig_dir = r'/home/mbettiati/LBE_MatteoBettiati/tests/Artificial_rybo_gen_jl/own_dca/output/figures'
     model_type = "eaDCA"
+    
     run_generation = True
     run_energy = True
+    
     bias = True 
-    double_bias = False
-    indel = True
+    indel = False
+    double = True    
+    
     do_one = True
     plotting = True
 
-    nchains = 2720
-    target_pearson = 0.94
 
-    if double_bias:
-        assert not bias, "Simple and Double bias cannot be considered at the same time!"
+    nchains = 10000
+    target_pearson = 0.8
+    clustering_sim = 0.92
 
-    if indel:
+    if double:
+        assert indel is False, "Indel should not be active when double bias is active"
+        alphabet = '*-AUCG'
+        out = 'double'
+        family_dir = os.path.join(family_dir, "indel")
+        gaps_fraction = (0.09, 0.11)
+
+    elif indel:
         alphabet = '*-AUCG'
         out = 'indel'
         family_dir = os.path.join(family_dir, "indel")
-        gaps_fraction = (0, 0.03)
-    elif double_bias:
-        alphabet = '*-AUCG'
-        out = 'double'
-        family_dir = os.path.join(family_dir, "double")
-        gaps_fraction = (0.15, 0.03)
+        gaps_fraction = (0.0,0.03)   
+
     else:
         alphabet = 'rna'
         out = 'raw'
         family_dir = os.path.join(family_dir, 'raw')
-        gaps_fraction = (0.15, 0)
+        gaps_fraction = (0.15,0.0)
 
     plot.get_summary(family_dir)
 
@@ -87,7 +92,8 @@ if __name__ == "__main__":
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
                           target_pearson=target_pearson,
-                          alphabet=alphabet)
+                          alphabet=alphabet,
+                          cluster_th=clustering_sim)
             else:
                 push.main(infile_path=infile_path, 
                           outdir=family_outdir, 
@@ -96,10 +102,11 @@ if __name__ == "__main__":
                           nchains=nchains, 
                           gaps_fraction=gaps_fraction,
                           target_pearson=target_pearson,
-                          alphabet=alphabet)
+                          alphabet=alphabet,
+                          cluster_th=clustering_sim)
 
         if run_energy:
-            energies.main(dca_seq_path=chain_file, param_dca_path=params_dca, outdir=family_outdir, alphabet=alphabet)
+            energies.main(dca_seq_path=chain_file, param_dca_path=params_dca, outdir=family_outdir, alphabet=alphabet, double=double)
 
         base_outdir = "/".join(family_outdir.split("/")[:-1])
 
@@ -110,6 +117,8 @@ if __name__ == "__main__":
         unbiased_params = os.path.join(outdir, "sequences", out, family_file.split('.')[0], "non_biased", "params.dat")
         
         if plotting:
+            if double :
+                fig_dir = os.path.join(fig_dir, f"double_{family_file.split('.')[0]}")
             fig_dir = os.path.join(fig_dir, family_file.split('.')[0])
             os.makedirs(fig_dir, exist_ok=True)
             plot_ss.homology_vs_gaps(chains_file_ref=unbiased_seqs, 
@@ -119,7 +128,8 @@ if __name__ == "__main__":
                                      fig_dir=fig_dir,
                                      params_path_unbiased=unbiased_params,
                                      params_path_biased=biased_params,
-                                     alphabet=alphabet)
+                                     alphabet=alphabet,
+                                     double=double)
 
         if do_one:
             break
